@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>IT Help Desk Counter</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #0f172a;
+            padding: 16px;
+            padding-bottom: 40px;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 12px 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        header h1 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+
+        #online-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+
+        #online-dot.offline {
+            background: #ef4444;
+        }
+
+        #clock {
+            font-size: 0.92rem;
+            color: #94a3b8;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .header-bottom {
+            font-size: 0.78rem;
+            color: #64748b;
+            min-height: 16px;
+        }
+
+        .header-bottom span {
+            font-weight: 600;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .card {
+            background: #1e293b;
+            border-radius: 20px;
+            padding: 20px 16px 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: background 0.15s;
+        }
+
+        .card.flash {
+            background: #334155;
+        }
+
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .card-label {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #cbd5e1;
+            line-height: 1.3;
+            flex: 1;
+        }
+
+        .undo-btn {
+            background: #0f172a;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.72rem;
+            color: #64748b;
+            padding: 4px 9px;
+            cursor: pointer;
+            white-space: nowrap;
+            margin-left: 8px;
+        }
+
+        .undo-btn:active {
+            background: #334155;
+            color: #94a3b8;
+        }
+
+        .card-count {
+            font-size: 3.2rem;
+            font-weight: 900;
+            line-height: 1;
+            text-align: center;
+            letter-spacing: -1px;
+        }
+
+        .tap-btn {
+            width: 100%;
+            padding: 16px 0;
+            border: none;
+            border-radius: 14px;
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: white;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform 0.08s, opacity 0.08s;
+        }
+
+        .tap-btn:active {
+            transform: scale(0.95);
+            opacity: 0.75;
+        }
+
+        .note-toggle {
+            background: none;
+            border: none;
+            font-size: 0.75rem;
+            color: #475569;
+            cursor: pointer;
+            text-align: left;
+            padding: 0;
+        }
+
+        .note-toggle:active {
+            color: #64748b;
+        }
+
+        .note-input {
+            display: none;
+            width: 100%;
+            border: 1.5px solid #334155;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            font-family: inherit;
+            color: #f1f5f9;
+            background: #0f172a;
+            resize: none;
+            min-height: 65px;
+        }
+
+        .note-input.open {
+            display: block;
+        }
+
+        .note-input::placeholder {
+            color: #475569;
+        }
+
+        /* Bottom bar */
+        .bottom-bar {
+            display: flex;
+            gap: 10px;
+            align-items: stretch;
+            margin-bottom: 12px;
+        }
+
+        .total-bar {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 16px 20px;
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+        }
+
+        .total-bar-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .total-bar-count {
+            font-size: 2.4rem;
+            font-weight: 900;
+            color: #f1f5f9;
+            letter-spacing: -1px;
+        }
+
+        .bottom-btn {
+            border: none;
+            border-radius: 16px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            padding: 0 18px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+            -webkit-tap-highlight-color: transparent;
+            white-space: nowrap;
+            transition: opacity 0.1s;
+        }
+
+        .bottom-btn:active {
+            opacity: 0.75;
+        }
+
+        .export-btn {
+            background: #0f766e;
+            color: #ccfbf1;
+        }
+
+        /* Clear All is intentionally muted — destructive action */
+        .reset-btn {
+            background: #1e293b;
+            color: #475569;
+            border: 1.5px solid #334155;
+            font-size: 0.75rem;
+            padding: 0 14px;
+        }
+
+        .reset-btn:active {
+            background: #334155;
+        }
+
+        #status-bar {
+            text-align: center;
+            font-size: 0.78rem;
+            color: #475569;
+            min-height: 18px;
+        }
+
+        #status-bar.error {
+            color: #ef4444;
+        }
+
+        #status-bar.success {
+            color: #10b981;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="header-top">
+            <div class="header-title">
+                <span id="online-dot"></span>
+                <h1>🖥️ IT Help Desk</h1>
+            </div>
+            <span id="clock"></span>
+        </div>
+        <div class="header-bottom" id="last-tap">No taps yet today</div>
+    </header>
+
+    <div class="grid" id="grid"></div>
+
+    <div class="bottom-bar">
+        <div class="total-bar">
+            <span class="total-bar-label">Today's Total</span>
+            <span class="total-bar-count" id="total-count">0</span>
+        </div>
+        <button class="bottom-btn export-btn" onclick="exportCSV()">⬇ Export</button>
+        <button class="bottom-btn reset-btn" onclick="hardReset()">🗑 Clear</button>
+    </div>
+
+    <div id="status-bar"></div>
+
+    <script>
+        // ─── CONFIG ───────────────────────────────────────────────
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzWhnIEfipkeRZvLJGoM1azeLPjqjb8sRBz4VeGhQMmspY04BeeK8jgSYAuyGUMx-Y/exec";
+        // ──────────────────────────────────────────────────────────
+
+        const categories = [
+            { label: "Walk Ups", color: "#3b82f6" },
+            { label: "Phone Calls", color: "#14b8a6" },
+            { label: "Printer Issues", color: "#f97316" },
+            { label: "General Questions", color: "#a855f7" },
+            { label: "4410 Hotline Call", color: "#ef4444" },
+            { label: "3D Printing", color: "#22c55e" },
+            { label: "Digital Requests", color: "#0ea5e9" },
+            { label: "Zoom Assistance", color: "#6366f1" },
+            { label: "Video Requests", color: "#ec4899" },
+            { label: "Charger", color: "#f59e0b" },
+        ];
+
+        let log = JSON.parse(localStorage.getItem("itLog")) || [];
+        let counts = JSON.parse(localStorage.getItem("itCounts")) || {};
+        categories.forEach(c => { if (counts[c.label] === undefined) counts[c.label] = 0; });
+
+        function save() {
+            localStorage.setItem("itLog", JSON.stringify(log));
+            localStorage.setItem("itCounts", JSON.stringify(counts));
+        }
+
+        function nowStrs() {
+            const d = new Date();
+            return {
+                date: d.toLocaleDateString("en-US"),
+                time: d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+            };
+        }
+
+        // ─── RENDER GRID ─────────────────────────────────────────
+        function renderGrid() {
+            const grid = document.getElementById("grid");
+            grid.innerHTML = "";
+            categories.forEach(cat => {
+                const id = cat.label.replace(/\s+/g, "_");
+                const card = document.createElement("div");
+                card.className = "card";
+                card.id = "card-" + id;
+                card.innerHTML = `
+        <div class="card-top">
+          <span class="card-label">${cat.label}</span>
+          <button class="undo-btn" onclick="undo('${cat.label}')">↩ Undo</button>
+        </div>
+        <div class="card-count" id="count-${id}" style="color:${cat.color}">
+          ${counts[cat.label]}
+        </div>
+        <button class="tap-btn" style="background:${cat.color}"
+          onclick="increment('${cat.label}', '${id}')">+ 1</button>
+        <button class="note-toggle" id="toggle-${id}"
+          onclick="toggleNote('${id}')">＋ Add note to last tap</button>
+        <textarea class="note-input" id="note-${id}"
+          placeholder="Note for last tap..."
+          onblur="attachNote('${cat.label}', '${id}')"></textarea>
+      `;
+                grid.appendChild(card);
+            });
+            renderTotal();
+        }
+
+        // ─── INCREMENT ───────────────────────────────────────────
+        function increment(label, id) {
+            const { date, time } = nowStrs();
+            counts[label]++;
+            log.push({ label, date, time, note: "", pushed: false });
+            save();
+            document.getElementById("count-" + id).textContent = counts[label];
+            renderTotal();
+            updateLastTap(label, time);
+            flashCard(id);
+
+            const noteEl = document.getElementById("note-" + id);
+            noteEl.value = "";
+            noteEl.classList.remove("open");
+            document.getElementById("toggle-" + id).textContent = "＋ Add note to last tap";
+        }
+
+        // ─── FLASH ───────────────────────────────────────────────
+        function flashCard(id) {
+            const card = document.getElementById("card-" + id);
+            card.classList.add("flash");
+            setTimeout(() => card.classList.remove("flash"), 200);
+        }
+
+        // ─── LAST TAP ────────────────────────────────────────────
+        function updateLastTap(label, time) {
+            const cat = categories.find(c => c.label === label);
+            document.getElementById("last-tap").innerHTML =
+                `Last: <span style="color:${cat.color}">${label}</span> &nbsp;·&nbsp; ${time}`;
+        }
+
+        // ─── UNDO ────────────────────────────────────────────────
+        function undo(label) {
+            if (counts[label] <= 0) return;
+            for (let i = log.length - 1; i >= 0; i--) {
+                if (log[i].label === label && !log[i].pushed) {
+                    log.splice(i, 1);
+                    break;
+                }
+            }
+            counts[label]--;
+            save();
+            const id = label.replace(/\s+/g, "_");
+            document.getElementById("count-" + id).textContent = counts[label];
+            renderTotal();
+        }
+
+        // ─── NOTE TOGGLE ─────────────────────────────────────────
+        function toggleNote(id) {
+            const noteEl = document.getElementById("note-" + id);
+            const toggleEl = document.getElementById("toggle-" + id);
+            const isOpen = noteEl.classList.contains("open");
+            if (isOpen) {
+                noteEl.classList.remove("open");
+                toggleEl.textContent = "＋ Add note to last tap";
+            } else {
+                noteEl.classList.add("open");
+                toggleEl.textContent = "− Hide note";
+                noteEl.focus();
+            }
+        }
+
+        // ─── ATTACH NOTE ─────────────────────────────────────────
+        function attachNote(label, id) {
+            const text = document.getElementById("note-" + id).value.trim();
+            if (!text) return;
+            for (let i = log.length - 1; i >= 0; i--) {
+                if (log[i].label === label && !log[i].pushed) {
+                    log[i].note = text;
+                    save();
+                    break;
+                }
+            }
+        }
+
+        // ─── TOTAL ───────────────────────────────────────────────
+        function renderTotal() {
+            const total = categories.reduce((sum, c) => sum + counts[c.label], 0);
+            document.getElementById("total-count").textContent = total;
+        }
+
+        // ─── EXPORT CSV ──────────────────────────────────────────
+        function exportCSV() {
+            if (log.length === 0) {
+                setStatus("No data to export yet.", "error");
+                return;
+            }
+
+            const today = new Date().toLocaleDateString("en-US").replace(/\//g, "-");
+            let csv = "Date,Time,Category,Note\n";
+            log.forEach(e => {
+                const note = (e.note || "").replace(/"/g, '""');
+                csv += `"${e.date}","${e.time}","${e.label}","${note}"\n`;
+            });
+
+            // Summary block
+            csv += "\nSummary\n";
+            csv += "Category,Total\n";
+            categories.forEach(c => {
+                csv += `"${c.label}",${counts[c.label]}\n`;
+            });
+            const total = categories.reduce((sum, c) => sum + counts[c.label], 0);
+            csv += `"TOTAL",${total}\n`;
+
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `IT_Log_${today}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ─── PUSH TO GOOGLE SHEET ────────────────────────────────
+        async function pushToSheet() {
+            const unpushed = log.filter(e => !e.pushed);
+            if (unpushed.length === 0) return true;
+
+            setStatus("Syncing...", "");
+            try {
+                await fetch(APPS_SCRIPT_URL, {
+                    method: "POST",
+                    mode: "no-cors",
+                    body: JSON.stringify({ entries: unpushed }),
+                    headers: { "Content-Type": "text/plain" }
+                });
+                log.forEach(e => { if (!e.pushed) e.pushed = true; });
+                save();
+                setStatus("Synced ✓", "success");
+                return true;
+            } catch {
+                setStatus("Sync failed — will retry in 5 min", "error");
+                return false;
+            }
+        }
+
+        // ─── HARD RESET ──────────────────────────────────────────
+        function hardReset() {
+            const confirmed = confirm(
+                "This will clear ALL data and local storage.\nUse only if something is broken.\n\nAre you sure?"
+            );
+            if (!confirmed) return;
+            localStorage.clear();
+            log = [];
+            counts = {};
+            categories.forEach(c => counts[c.label] = 0);
+            save();
+            renderGrid();
+            document.getElementById("last-tap").textContent = "No taps yet today";
+            setStatus("All data cleared.", "success");
+        }
+
+        // ─── MIDNIGHT RESET ──────────────────────────────────────
+        function msUntilMidnight() {
+            const now = new Date();
+            const midnight = new Date(now);
+            midnight.setHours(24, 0, 0, 0);
+            return midnight - now;
+        }
+
+        async function midnightReset() {
+            const success = await pushToSheet();
+            if (success) {
+                log = [];
+                categories.forEach(c => counts[c.label] = 0);
+                save();
+                renderGrid();
+                document.getElementById("last-tap").textContent = "No taps yet today";
+                setStatus("New day started ✓", "success");
+                scheduleMidnight();
+            } else {
+                setStatus("Reset pending — retrying in 5 min...", "error");
+                setTimeout(midnightReset, 5 * 60 * 1000);
+            }
+        }
+
+        function scheduleMidnight() {
+            setTimeout(midnightReset, msUntilMidnight());
+        }
+
+        // ─── ONLINE INDICATOR ────────────────────────────────────
+        function updateOnline() {
+            const dot = document.getElementById("online-dot");
+            dot.classList.toggle("offline", !navigator.onLine);
+        }
+        window.addEventListener("online", updateOnline);
+        window.addEventListener("offline", updateOnline);
+
+        // ─── STATUS BAR ──────────────────────────────────────────
+        function setStatus(msg, type) {
+            const el = document.getElementById("status-bar");
+            el.textContent = msg;
+            el.className = type;
+            if (type === "success") setTimeout(() => { el.textContent = ""; el.className = ""; }, 4000);
+        }
+
+        // ─── CLOCK ───────────────────────────────────────────────
+        function updateClock() {
+            document.getElementById("clock").textContent =
+                new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+        }
+
+        // ─── INIT ────────────────────────────────────────────────
+        renderGrid();
+        scheduleMidnight();
+        updateClock();
+        updateOnline();
+        setInterval(updateClock, 30000);
+
+        (async () => {
+            if (log.some(e => !e.pushed)) await pushToSheet();
+        })();
+    </script>
+</body>
+
+</html>
