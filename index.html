@@ -69,13 +69,27 @@
         }
 
         .header-bottom {
-            font-size: 0.78rem;
-            color: #64748b;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             min-height: 16px;
         }
 
-        .header-bottom span {
+        .header-bottom-left {
+            font-size: 0.78rem;
+            color: #64748b;
+        }
+
+        .header-bottom-left span {
             font-weight: 600;
+        }
+
+        /* Unsynced badge */
+        #unsynced-badge {
+            font-size: 0.72rem;
+            color: #f59e0b;
+            font-weight: 600;
+            display: none;
         }
 
         .grid {
@@ -279,7 +293,6 @@
 
 <body>
 
-    <!-- ─── SOUND: audio element for Charger tap -->
     <audio id="charger-sound" src="tap.mp3" preload="auto"></audio>
 
     <header>
@@ -290,7 +303,10 @@
             </div>
             <span id="clock"></span>
         </div>
-        <div class="header-bottom" id="last-tap">No taps yet today</div>
+        <div class="header-bottom">
+            <div class="header-bottom-left" id="last-tap">No taps yet today</div>
+            <span id="unsynced-badge"></span>
+        </div>
     </header>
 
     <div class="grid" id="grid"></div>
@@ -309,7 +325,6 @@
     <script>
         // ─── CONFIG ───────────────────────────────────────────────
         const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzWhnIEfipkeRZvLJGoM1azeLPjqjb8sRBz4VeGhQMmspY04BeeK8jgSYAuyGUMx-Y/exec";
-        // ──────────────────────────────────────────────────────────
 
         const categories = [
             { label: "Walk Ups", color: "#3b82f6" },
@@ -341,7 +356,11 @@
             };
         }
 
-        // ─── SOUND: play only for Charger ────────────────────────
+        function today() {
+            return new Date().toLocaleDateString("en-US");
+        }
+
+        // ─── SOUND: Charger only ──────────────────────────────────
         function playChargerSound() {
             const sound = document.getElementById("charger-sound");
             sound.currentTime = 0;
@@ -358,21 +377,21 @@
                 card.className = "card";
                 card.id = "card-" + id;
                 card.innerHTML = `
-        <div class="card-top">
-          <span class="card-label">${cat.label}</span>
-          <button class="undo-btn" onclick="undo('${cat.label}')">↩ Undo</button>
-        </div>
-        <div class="card-count" id="count-${id}" style="color:${cat.color}">
-          ${counts[cat.label]}
-        </div>
-        <button class="tap-btn" style="background:${cat.color}"
-          onclick="increment('${cat.label}', '${id}')">+ 1</button>
-        <button class="note-toggle" id="toggle-${id}"
-          onclick="toggleNote('${id}')">＋ Add note to last tap</button>
-        <textarea class="note-input" id="note-${id}"
-          placeholder="Note for last tap..."
-          onblur="attachNote('${cat.label}', '${id}')"></textarea>
-      `;
+                    <div class="card-top">
+                        <span class="card-label">${cat.label}</span>
+                        <button class="undo-btn" onclick="undo('${cat.label}')">↩ Undo</button>
+                    </div>
+                    <div class="card-count" id="count-${id}" style="color:${cat.color}">
+                        ${counts[cat.label]}
+                    </div>
+                    <button class="tap-btn" style="background:${cat.color}"
+                        onclick="increment('${cat.label}', '${id}')">+ 1</button>
+                    <button class="note-toggle" id="toggle-${id}"
+                        onclick="toggleNote('${id}')">＋ Add note to last tap</button>
+                    <textarea class="note-input" id="note-${id}"
+                        placeholder="Note for last tap..."
+                        onblur="attachNote('${cat.label}', '${id}')"></textarea>
+                `;
                 grid.appendChild(card);
             });
             renderTotal();
@@ -380,9 +399,7 @@
 
         // ─── INCREMENT ───────────────────────────────────────────
         function increment(label, id) {
-            // ─── SOUND: fire only for Charger ────────────────────
             if (label === "Charger") playChargerSound();
-
             const { date, time } = nowStrs();
             counts[label]++;
             log.push({ label, date, time, note: "", pushed: false });
@@ -390,6 +407,7 @@
             document.getElementById("count-" + id).textContent = counts[label];
             renderTotal();
             updateLastTap(label, time);
+            updateUnsyncedBadge();
             flashCard(id);
             const noteEl = document.getElementById("note-" + id);
             noteEl.value = "";
@@ -397,18 +415,28 @@
             document.getElementById("toggle-" + id).textContent = "＋ Add note to last tap";
         }
 
-        // ─── FLASH ───────────────────────────────────────────────
         function flashCard(id) {
             const card = document.getElementById("card-" + id);
             card.classList.add("flash");
             setTimeout(() => card.classList.remove("flash"), 200);
         }
 
-        // ─── LAST TAP ────────────────────────────────────────────
         function updateLastTap(label, time) {
             const cat = categories.find(c => c.label === label);
             document.getElementById("last-tap").innerHTML =
                 `Last: <span style="color:${cat.color}">${label}</span> &nbsp;·&nbsp; ${time}`;
+        }
+
+        // ─── UNSYNCED BADGE ──────────────────────────────────────
+        function updateUnsyncedBadge() {
+            const count = log.filter(e => !e.pushed).length;
+            const badge = document.getElementById("unsynced-badge");
+            if (count > 0) {
+                badge.textContent = `⏳ ${count} unsynced`;
+                badge.style.display = "inline";
+            } else {
+                badge.style.display = "none";
+            }
         }
 
         // ─── UNDO ────────────────────────────────────────────────
@@ -425,9 +453,10 @@
             const id = label.replace(/\s+/g, "_");
             document.getElementById("count-" + id).textContent = counts[label];
             renderTotal();
+            updateUnsyncedBadge();
         }
 
-        // ─── NOTE TOGGLE ─────────────────────────────────────────
+        // ─── NOTE ────────────────────────────────────────────────
         function toggleNote(id) {
             const noteEl = document.getElementById("note-" + id);
             const toggleEl = document.getElementById("toggle-" + id);
@@ -442,7 +471,6 @@
             }
         }
 
-        // ─── ATTACH NOTE ─────────────────────────────────────────
         function attachNote(label, id) {
             const text = document.getElementById("note-" + id).value.trim();
             if (!text) return;
@@ -463,47 +491,41 @@
 
         // ─── EXPORT CSV ──────────────────────────────────────────
         function exportCSV() {
-            if (log.length === 0) {
-                setStatus("No data to export yet.", "error");
-                return;
-            }
-            const today = new Date().toLocaleDateString("en-US").replace(/\//g, "-");
+            if (log.length === 0) { setStatus("No data to export yet.", "error"); return; }
+            const todayStr = new Date().toLocaleDateString("en-US").replace(/\//g, "-");
             let csv = "Date,Time,Category,Note\n";
             log.forEach(e => {
                 const note = (e.note || "").replace(/"/g, '""');
                 csv += `"${e.date}","${e.time}","${e.label}","${note}"\n`;
             });
-            csv += "\nSummary\n";
-            csv += "Category,Total\n";
-            categories.forEach(c => {
-                csv += `"${c.label}",${counts[c.label]}\n`;
-            });
+            csv += "\nSummary\nCategory,Total\n";
+            categories.forEach(c => { csv += `"${c.label}",${counts[c.label]}\n`; });
             const total = categories.reduce((sum, c) => sum + counts[c.label], 0);
             csv += `"TOTAL",${total}\n`;
             const blob = new Blob([csv], { type: "text/csv" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
-            a.href = url;
-            a.download = `IT_Log_${today}.csv`;
-            a.click();
+            a.href = url; a.download = `IT_Log_${todayStr}.csv`; a.click();
             URL.revokeObjectURL(url);
         }
 
-        // ─── PUSH TO GOOGLE SHEET ────────────────────────────────
+        // ─── PUSH TO SHEET ───────────────────────────────────────
         async function pushToSheet() {
             const unpushed = log.filter(e => !e.pushed);
             if (unpushed.length === 0) return true;
             setStatus("Syncing...", "");
             try {
+                const params = new URLSearchParams();
+                params.append("data", JSON.stringify(unpushed));
                 await fetch(APPS_SCRIPT_URL, {
                     method: "POST",
                     mode: "no-cors",
-                    body: JSON.stringify({ entries: unpushed }),
-                    headers: { "Content-Type": "text/plain" }
+                    body: params
                 });
                 log.forEach(e => { if (!e.pushed) e.pushed = true; });
                 save();
                 setStatus("Synced ✓", "success");
+                updateUnsyncedBadge();
                 return true;
             } catch {
                 setStatus("Sync failed — will retry in 5 min", "error");
@@ -518,12 +540,11 @@
             );
             if (!confirmed) return;
             localStorage.clear();
-            log = [];
-            counts = {};
+            log = []; counts = {};
             categories.forEach(c => counts[c.label] = 0);
-            save();
-            renderGrid();
+            save(); renderGrid();
             document.getElementById("last-tap").textContent = "No taps yet today";
+            updateUnsyncedBadge();
             setStatus("All data cleared.", "success");
         }
 
@@ -540,9 +561,10 @@
             if (success) {
                 log = [];
                 categories.forEach(c => counts[c.label] = 0);
-                save();
-                renderGrid();
+                save(); renderGrid();
+                localStorage.setItem("itLastResetDate", today());
                 document.getElementById("last-tap").textContent = "No taps yet today";
+                updateUnsyncedBadge();
                 setStatus("New day started ✓", "success");
                 scheduleMidnight();
             } else {
@@ -551,14 +573,27 @@
             }
         }
 
-        function scheduleMidnight() {
-            setTimeout(midnightReset, msUntilMidnight());
+        function scheduleMidnight() { setTimeout(midnightReset, msUntilMidnight()); }
+
+        // ─── MISSED MIDNIGHT DETECTION ───────────────────────────
+        // Fires on load and whenever the tab/app comes back into focus.
+        // If the stored last-reset date is not today, a reset was missed
+        // (e.g. iPad was asleep at midnight) — trigger it now.
+        async function checkMissedReset() {
+            const lastReset = localStorage.getItem("itLastResetDate");
+            if (lastReset && lastReset !== today()) {
+                setStatus("Missed midnight reset — catching up...", "");
+                await midnightReset();
+            }
         }
+
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") checkMissedReset();
+        });
 
         // ─── ONLINE INDICATOR ────────────────────────────────────
         function updateOnline() {
-            const dot = document.getElementById("online-dot");
-            dot.classList.toggle("offline", !navigator.onLine);
+            document.getElementById("online-dot").classList.toggle("offline", !navigator.onLine);
         }
         window.addEventListener("online", updateOnline);
         window.addEventListener("offline", updateOnline);
@@ -566,8 +601,7 @@
         // ─── STATUS BAR ──────────────────────────────────────────
         function setStatus(msg, type) {
             const el = document.getElementById("status-bar");
-            el.textContent = msg;
-            el.className = type;
+            el.textContent = msg; el.className = type;
             if (type === "success") setTimeout(() => { el.textContent = ""; el.className = ""; }, 4000);
         }
 
@@ -579,11 +613,14 @@
 
         // ─── INIT ────────────────────────────────────────────────
         renderGrid();
+        updateUnsyncedBadge();
         scheduleMidnight();
         updateClock();
         updateOnline();
         setInterval(updateClock, 30000);
+        // On load: check for missed midnight, then push anything still pending
         (async () => {
+            await checkMissedReset();
             if (log.some(e => !e.pushed)) await pushToSheet();
         })();
     </script>
