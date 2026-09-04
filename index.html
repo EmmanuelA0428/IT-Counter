@@ -262,6 +262,15 @@
             color: #ccfbf1;
         }
 
+        .sync-btn {
+            background: #1d4ed8;
+            color: #dbeafe;
+        }
+
+        .sync-btn:active {
+            opacity: 0.85;
+        }
+
         .reset-btn {
             background: #1e293b;
             color: #475569;
@@ -317,6 +326,7 @@
             <span class="total-bar-count" id="total-count">0</span>
         </div>
         <button class="bottom-btn export-btn" onclick="exportCSV()">⬇ Export</button>
+        <button type="button" class="bottom-btn sync-btn" onclick="syncNow()">↻ Sync</button>
         <button class="bottom-btn reset-btn" onclick="hardReset()">🗑 Clear</button>
     </div>
 
@@ -324,9 +334,14 @@
 
     <script>
         // ─── CONFIG ───────────────────────────────────────────────
-        const APPS_SCRIPT_URL = " https://script.google.com/macros/s/AKfycbykAAK8KBTqwHm353ZPZPGws6E2lgH0mt0-1H6rUYvGT-JTCHFhBmEpcZbpnhzL1uEY/exec";
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbykAAK8KBTqwHm353ZPZPGws6E2lgH0mt0-1H6rUYvGT-JTCHFhBmEpcZbpnhzL1uEY/exec";
 
+        const SHEET_SYNC_LOCK = "it-counter-sheet-sync";
 
+        function newEventId() {
+            if (crypto.randomUUID) return crypto.randomUUID();
+            return Date.now() + "-" + Math.random().toString(36).slice(2, 12);
+        }
 
         const categories = [
             { label: "Walk Ups", color: "#3b82f6" },
@@ -344,6 +359,11 @@
         let log = JSON.parse(localStorage.getItem("itLog")) || [];
         let counts = JSON.parse(localStorage.getItem("itCounts")) || {};
         categories.forEach(c => { if (counts[c.label] === undefined) counts[c.label] = 0; });
+        let migratedIds = false;
+        for (let i = 0; i < log.length; i++) {
+            if (!log[i].id) { log[i].id = newEventId(); migratedIds = true; }
+        }
+        if (migratedIds) save();
 
         function save() {
             localStorage.setItem("itLog", JSON.stringify(log));
@@ -404,7 +424,7 @@
             if (label === "Charger") playChargerSound();
             const { date, time } = nowStrs();
             counts[label]++;
-            log.push({ label, date, time, note: "", pushed: false });
+            log.push({ id: newEventId(), label, date, time, note: "", pushed: false });
             save();
             document.getElementById("count-" + id).textContent = counts[label];
             renderTotal();
@@ -512,7 +532,9 @@
         }
 
         // ─── PUSH TO SHEET ───────────────────────────────────────
-        async function pushToSheet() {
+        // no-cors: cannot read response; duplicate POSTs are avoided by Web Locks (cross-tab).
+        // Each row has a stable `id` so Apps Script can skip duplicates if you add a check there.
+        async function pushToSheetBody() {
             const unpushed = log.filter(e => !e.pushed);
             if (unpushed.length === 0) return true;
             setStatus("Syncing...", "");
@@ -533,6 +555,21 @@
                 setStatus("Sync failed — will retry in 5 min", "error");
                 return false;
             }
+        }
+
+        async function pushToSheet() {
+            if (navigator.locks && navigator.locks.request) {
+                return navigator.locks.request(SHEET_SYNC_LOCK, pushToSheetBody);
+            }
+            return pushToSheetBody();
+        }
+
+        async function syncNow() {
+            if (!log.some(e => !e.pushed)) {
+                setStatus("Nothing to sync — no unsynced rows.", "");
+                return;
+            }
+            await pushToSheet();
         }
 
         // ─── HARD RESET ──────────────────────────────────────────
@@ -579,14 +616,25 @@
 
         // ─── MISSED MIDNIGHT DETECTION ───────────────────────────
         // Fires on load and whenever the tab/app comes back into focus.
-        // If the stored last-reset date is not today, a reset was missed
-        // (e.g. iPad was asleep at midnight) — trigger it now.
-        async function checkMissedReset() {
+        function primeLastResetDateIfNeeded() {
+            if (localStorage.getItem("itLastResetDate")) return;
+            if (log.length > 0) return;
+            localStorage.setItem("itLastResetDate", today());
+        }
+
+        function shouldCatchUpMissedMidnight() {
+            const t = today();
             const lastReset = localStorage.getItem("itLastResetDate");
-            if (lastReset && lastReset !== today()) {
-                setStatus("Missed midnight reset — catching up...", "");
-                await midnightReset();
-            }
+            if (lastReset && lastReset !== t) return true;
+            if (!lastReset && log.length > 0 && log.some(e => e.date !== t)) return true;
+            return false;
+        }
+
+        async function checkMissedReset() {
+            primeLastResetDateIfNeeded();
+            if (!shouldCatchUpMissedMidnight()) return;
+            setStatus("Missed midnight reset — catching up...", "");
+            await midnightReset();
         }
 
         document.addEventListener("visibilitychange", () => {
@@ -616,6 +664,7 @@
         // ─── INIT ────────────────────────────────────────────────
         renderGrid();
         updateUnsyncedBadge();
+        primeLastResetDateIfNeeded();
         scheduleMidnight();
         updateClock();
         updateOnline();
